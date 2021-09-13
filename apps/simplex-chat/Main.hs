@@ -20,8 +20,8 @@ welcomeGetOpts :: IO ChatOpts
 welcomeGetOpts = do
   appDir <- getAppUserDataDirectory "simplex"
   opts@ChatOpts {dbFile} <- getChatOpts appDir
-  putStrLn "SimpleX chat prototype v0.3.1"
-  putStrLn $ "db: " <> dbFile
+  putStrLn "SimpleX chat prototype v0.4.0"
+  putStrLn $ "db: " <> dbFile <> ".chat.db, " <> dbFile <> ".agent.db"
   putStrLn "type \"/help\" or \"/h\" for usage info"
   pure opts
 

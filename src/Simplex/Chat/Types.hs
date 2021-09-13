@@ -123,6 +123,7 @@ data ReceivedGroupInvitation = ReceivedGroupInvitation
 
 data GroupMember = GroupMember
   { groupMemberId :: Int64,
+    groupId :: Int64,
     memberId :: MemberId,
     memberRole :: GroupMemberRole,
     memberCategory :: GroupMemberCategory,
@@ -299,6 +300,78 @@ serializeMemberStatus = \case
   GSMemComplete -> "complete"
   GSMemCreator -> "creator"
 
+data SndFileTransfer = SndFileTransfer
+  { fileId :: Int64,
+    fileName :: String,
+    filePath :: String,
+    fileSize :: Integer,
+    chunkSize :: Integer,
+    recipientDisplayName :: ContactName,
+    connId :: Int64,
+    agentConnId :: ConnId,
+    fileStatus :: FileStatus
+  }
+  deriving (Eq, Show)
+
+data FileInvitation = FileInvitation
+  { fileName :: String,
+    fileSize :: Integer,
+    fileQInfo :: SMPQueueInfo
+  }
+  deriving (Eq, Show)
+
+data RcvFileTransfer = RcvFileTransfer
+  { fileId :: Int64,
+    fileInvitation :: FileInvitation,
+    fileStatus :: RcvFileStatus,
+    senderDisplayName :: ContactName,
+    chunkSize :: Integer
+  }
+  deriving (Eq, Show)
+
+data RcvFileStatus
+  = RFSNew
+  | RFSAccepted RcvFileInfo
+  | RFSConnected RcvFileInfo
+  | RFSComplete RcvFileInfo
+  | RFSCancelled RcvFileInfo
+  deriving (Eq, Show)
+
+data RcvFileInfo = RcvFileInfo
+  { filePath :: FilePath,
+    connId :: Int64,
+    agentConnId :: ConnId
+  }
+  deriving (Eq, Show)
+
+data FileTransfer = FTSnd [SndFileTransfer] | FTRcv RcvFileTransfer
+
+data FileStatus = FSNew | FSAccepted | FSConnected | FSComplete | FSCancelled deriving (Eq, Ord, Show)
+
+instance FromField FileStatus where fromField = fromTextField_ fileStatusT
+
+instance ToField FileStatus where toField = toField . serializeFileStatus
+
+fileStatusT :: Text -> Maybe FileStatus
+fileStatusT = \case
+  "new" -> Just FSNew
+  "accepted" -> Just FSAccepted
+  "connected" -> Just FSConnected
+  "complete" -> Just FSComplete
+  "cancelled" -> Just FSCancelled
+  _ -> Nothing
+
+serializeFileStatus :: FileStatus -> Text
+serializeFileStatus = \case
+  FSNew -> "new"
+  FSAccepted -> "accepted"
+  FSConnected -> "connected"
+  FSComplete -> "complete"
+  FSCancelled -> "cancelled"
+
+data RcvChunkStatus = RcvChunkOk | RcvChunkFinal | RcvChunkDuplicate | RcvChunkError
+  deriving (Eq, Show)
+
 data Connection = Connection
   { connId :: Int64,
     agentConnId :: ConnId,
@@ -306,7 +379,7 @@ data Connection = Connection
     viaContact :: Maybe Int64,
     connType :: ConnType,
     connStatus :: ConnStatus,
-    entityId :: Maybe Int64, -- contact or group member ID
+    entityId :: Maybe Int64, -- contact, group member or file ID
     createdAt :: UTCTime
   }
   deriving (Eq, Show)
@@ -353,7 +426,7 @@ serializeConnStatus = \case
   ConnReady -> "ready"
   ConnDeleted -> "deleted"
 
-data ConnType = ConnContact | ConnMember
+data ConnType = ConnContact | ConnMember | ConnSndFile | ConnRcvFile
   deriving (Eq, Show)
 
 instance FromField ConnType where fromField = fromTextField_ connTypeT
@@ -364,12 +437,16 @@ connTypeT :: Text -> Maybe ConnType
 connTypeT = \case
   "contact" -> Just ConnContact
   "member" -> Just ConnMember
+  "snd_file" -> Just ConnSndFile
+  "rcv_file" -> Just ConnRcvFile
   _ -> Nothing
 
 serializeConnType :: ConnType -> Text
 serializeConnType = \case
   ConnContact -> "contact"
   ConnMember -> "member"
+  ConnSndFile -> "snd_file"
+  ConnRcvFile -> "rcv_file"
 
 data NewConnection = NewConnection
   { agentConnId :: ByteString,
